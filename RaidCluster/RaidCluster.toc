@@ -1,0 +1,12 @@
+## Interface: 30300
+## Title: RaidCluster
+## Notes: Shows Clusters on the Raidframe.
+## Version: 1.0.0
+## Author: NoM0Re
+## DefaultState: enabled
+## SavedVariables: RaidCluster_DB
+## X-Website: https://github.com/NoM0Re/RaidCluster
+
+libs.xml
+
+Core.lua
