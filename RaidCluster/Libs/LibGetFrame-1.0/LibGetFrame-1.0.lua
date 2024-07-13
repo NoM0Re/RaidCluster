@@ -11,7 +11,6 @@ local GetPlayerInfoByGUID, UnitExists, IsAddOnLoaded, UnitIsUnit, SecureButton_G
 local tinsert, CopyTable, wipe = tinsert, CopyTable, wipe
 
 local maxDepth = 50
-local eventLock = false
 
 local defaultFramePriorities = {
     -- raid frames
@@ -146,22 +145,17 @@ local function waitFrame_OnUpdate(self, elapsed)
 	self.delay = (self.delay or 1) - elapsed
 	if self.delay < 0 then
 		doScanForUnitFrames()
-        eventLock = false
 		self:SetScript("OnUpdate", nil)
 		self.delay = nil
 	end
 end
 
-local function ScanForUnitFrames(noDelay, moredelay)
+local function ScanForUnitFrames(noDelay)
     if noDelay then
         doScanForUnitFrames()
     elseif not wait then
         wait = true
-        if moredelay then
-            waitFrame.delay = 3
-        else
-            waitFrame.delay = 1
-        end
+        waitFrame.delay = 1
 		waitFrame:SetScript("OnUpdate", waitFrame_OnUpdate)
     end
 end
@@ -241,15 +235,7 @@ local function Init(noDelay)
     GetFramesCacheListener:RegisterEvent("PLAYER_ENTERING_WORLD")
     GetFramesCacheListener:RegisterEvent("PARTY_MEMBERS_CHANGED")
     GetFramesCacheListener:RegisterEvent("RAID_ROSTER_UPDATE")
-    GetFramesCacheListener:SetScript("OnEvent", function(self, e, ...)
-        if eventLock then return end
-        eventLock = true
-        if e == "PLAYER_REGEN_ENABLED" or e == "PLAYER_REGEN_DISABLED"then
-            ScanForUnitFrames(false, true)
-        else
-            ScanForUnitFrames(false)
-        end
-     end)
+    GetFramesCacheListener:SetScript("OnEvent", function() ScanForUnitFrames(false) end)
     ScanForUnitFrames(noDelay)
 end
 
@@ -313,3 +299,44 @@ function lib.GetUnitFrame(target, opt)
     end
 end
 lib.GetFrame = lib.GetUnitFrame -- compatibility
+
+-- nameplates
+function lib.GetUnitNameplate(unit)
+    if not unit then
+      return
+    end
+    local nameplate = C_NamePlate.GetNamePlateForUnit(unit)
+    if nameplate then
+      -- credit to Exality for https://wago.io/explosiveorbs
+      if nameplate.unitFrame and nameplate.unitFrame.Health then
+        -- elvui
+        return nameplate.unitFrame.Health
+      elseif nameplate.unitFramePlater and nameplate.unitFramePlater.healthBar then
+        -- plater
+        return nameplate.unitFramePlater.healthBar
+      elseif nameplate.kui and nameplate.kui.HealthBar then
+        -- kui
+        return nameplate.kui.HealthBar
+      elseif nameplate.extended and nameplate.extended.visual and nameplate.extended.visual.healthbar then
+        -- tidyplates
+        return nameplate.extended.visual.healthbar
+      elseif nameplate.TPFrame and nameplate.TPFrame.visual and nameplate.TPFrame.visual.healthbar then
+        -- tidyplates: threat plates
+        return nameplate.TPFrame.visual.healthbar
+      elseif nameplate.unitFrame and nameplate.unitFrame.Health then
+        -- bdui nameplates
+        return nameplate.unitFrame.Health
+      elseif nameplate.ouf and nameplate.ouf.Health then
+        -- bdNameplates
+        return nameplate.ouf.Health
+      elseif nameplate.slab and nameplate.slab.components and nameplate.slab.components.healthBar and nameplate.slab.components.healthBar.frame then
+        -- Slab
+        return nameplate.slab.components.healthBar.frame
+      elseif nameplate.UnitFrame and nameplate.UnitFrame.healthBar then
+        -- default
+        return nameplate.UnitFrame.healthBar
+      else
+        return nameplate
+      end
+    end
+end
