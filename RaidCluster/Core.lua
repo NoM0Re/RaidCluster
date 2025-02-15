@@ -600,8 +600,8 @@ function RaidCluster:GetMapSize()
 	local level = GetCurrentMapDungeonLevel()
 	local usesTerrainMap = DungeonUsesTerrainMap()
 	level = usesTerrainMap and level - 1 or level
-	local dims = self.MapSizes[mapName] and self.MapSizes[mapName][level]
-	return dims[1], dims[2]
+	local dims = self.MapSizes[mapName] and self.MapSizes[mapName][level] or { 1, 1 }
+	return dims[1] , dims[2]
 end
 
 function RaidCluster:MapZoneChanged()
@@ -1671,11 +1671,11 @@ local function EventHandler(self, event, ...)
     if (event == "RAID_ROSTER_UPDATE") or (event == "PARTY_MEMBERS_CHANGED") then
         RaidCluster:OnRosterUpdate()
     elseif (event == "ZONE_CHANGED") or (event == "ZONE_CHANGED_INDOORS") or (event == "ZONE_CHANGED_NEW_AREA") then
-        RaidCluster:MapZoneChanged()
+        RaidCluster:ScheduleTimer("MapZoneChanged", 1)
     elseif (event == "PLAYER_TALENT_UPDATE") then
         RaidCluster:specDetection()
     elseif (event == "PLAYER_ENTERING_WORLD") then
-        RaidCluster:ScheduleTimer(function() RaidCluster:OnPlayerLogin() end, 5)
+        RaidCluster:ScheduleTimer("OnPlayerLogin", 5)
     end
 end
 
