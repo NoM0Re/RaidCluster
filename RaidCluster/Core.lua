@@ -1697,9 +1697,27 @@ function RaidCluster:OnInitialize()
     ACD:AddToBlizOptions("RaidCluster")
     ACD:AddToBlizOptions("RaidCluster_Profiles", "Profiles", "RaidCluster")
 
+    do
+        local isInit
+        LGF.RegisterCallback("RaidCluster", "GETFRAME_REFRESH", function(event)
+            if isInit then return end
+            isInit = true
+            RaidCluster:specDetection()
+        end)
+        LGF:ScanForUnitFrames()
+    end
+
     --SlashCmds
 	self:RegisterChatCommand("rac", "SlashCommand")
 	self:RegisterChatCommand("raidcluster", "SlashCommand")
+
+    -- Frame Creation
+    self.EventHandler = CreateFrame("Frame")
+    self.EventHandler:RegisterEvent("PLAYER_TALENT_UPDATE")
+    self.EventHandler:RegisterEvent("PLAYER_ENTERING_WORLD")
+    self.EventHandler:SetScript("OnEvent", EventHandler)
+
+    self.CLEU = CreateFrame("Frame")
 
     self.OnInitialize = nil
 end
@@ -1707,15 +1725,8 @@ end
 function RaidCluster:OnEnable()
     db = self.db.profile
 
-    self:RegisterMaps()
-
-    self.EventHandler = CreateFrame("Frame")
-    self.EventHandler:RegisterEvent("PLAYER_TALENT_UPDATE")
-    self.EventHandler:RegisterEvent("PLAYER_ENTERING_WORLD")
-    self.EventHandler:SetScript("OnEvent", EventHandler)
-
     self.playerName = UnitName("player")
-    self.CLEU = CreateFrame("Frame")
+    self:RegisterMaps()
 
     self.OnEnable = nil
 end
@@ -1724,7 +1735,6 @@ function RaidCluster:OnPlayerLogin()
     self.EventHandler:UnregisterEvent("PLAYER_ENTERING_WORLD")
 
     self:MapZoneChanged()
-    self:specDetection()
 
     self.OnPlayerLogin = nil
 end
