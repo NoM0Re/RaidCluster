@@ -38,8 +38,6 @@ function RaidCluster:FixProfileDefaults(profile, defaults)
                 profile[key] = CopyTable(defaultValue)
             elseif type(currentValue) ~= "table" then
                 profile[key] = CopyTable(defaultValue)
-            else
-                self.FixProfileDefaults(currentValue, defaultValue)
             end
         else
             if currentValue == nil then
