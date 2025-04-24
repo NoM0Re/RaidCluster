@@ -20,7 +20,8 @@ local AddonName = ...
 local RaidCluster = select(2, ...)
 
 -- Libs
-RaidCluster = LibStub("AceAddon-3.0"):NewAddon(AddonName, "AceConsole-3.0", "AceTimer-3.0")
+RaidCluster = LibStub("AceAddon-3.0"):NewAddon(RaidCluster, "RaidCluster", "AceConsole-3.0", "AceTimer-3.0")
+_G.RaidCluster = RaidCluster
 local LGF = LibStub("LibGetFrame-1.0")
 local LCG = LibStub("LibCustomGlow-1.0")
 local AC = LibStub("AceConfig-3.0")
@@ -380,19 +381,14 @@ end
 
 function RaidCluster:EventLock()
     self.eventLock = false
-    self:MapZoneChanged()
     self:specDetection()
 end
 
-local raidMembersChanged
 function RaidCluster:OnRosterUpdate(event)
-    if (raidMembersChanged ~= GetNumRaidMembers()) or (event == "PARTY_MEMBERS_CHANGED") then -- Prevents unnecessary addon restarts when other ppl reload, relog or disconnect
-        raidMembersChanged = GetNumRaidMembers()
-        if self.eventLock then return end -- already queued a refresh
-        self.eventLock = true
-        self:StopAddon()
-        self:ScheduleTimer("EventLock", 0.5)
-    end
+    if self.eventLock then return end
+    self.eventLock = true
+    self:StopAddon()
+    self:ScheduleTimer("EventLock", 0.5)
 end
 
 function RaidCluster:OnFPSrefresh()
@@ -451,6 +447,7 @@ function RaidCluster:StopAddon()
     self.IsInit = false
     self:CancelTimer(self.FPSTimer)
     self.EventHandler:UnregisterEvent("RAID_ROSTER_UPDATE")
+    self.EventHandler:UnregisterEvent("PARTY_MEMBERS_CHANGED")
     self.EventHandler:UnregisterEvent("ZONE_CHANGED")
     self.EventHandler:UnregisterEvent("ZONE_CHANGED_INDOORS")
     self.EventHandler:UnregisterEvent("ZONE_CHANGED_NEW_AREA")
@@ -489,6 +486,7 @@ function RaidCluster:StartAddon(Class)
     self.EventHandler:RegisterEvent("ZONE_CHANGED_INDOORS")
     self.EventHandler:RegisterEvent("ZONE_CHANGED_NEW_AREA")
     self.EventHandler:RegisterEvent("RAID_ROSTER_UPDATE")
+    self.EventHandler:RegisterEvent("PARTY_MEMBERS_CHANGED")
     self:ParentPlayerRaidFrames()
     self.FPSTimer = self:ScheduleRepeatingTimer("OnFPSrefresh", db.update or 1)
 end
