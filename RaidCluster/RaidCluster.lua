@@ -342,11 +342,20 @@ function RaidCluster:CalculateGroupPlayersToGroupPlayers()
     self:UpdateFrames(playersInRangeCount, false)
 end
 
+function RaidCluster:FixHealbotPlayerFrame(frame)
+    local name = frame:GetName()
+    if not (name and name:match("^HealBot_Action_HealUnit%d+$")) then
+        return frame
+    end
+    return _G[name .. "Bar4"] or frame
+end
+
 function RaidCluster:ProcessPlayerFrame(playerName, subGroup, playerClass)
     local unusedString, frameName = self:GetUnusedString()
     if unusedString and frameName then
         local playerFrame = GetFrame(playerName) -- Get the Raidframe
         if playerFrame then
+            playerFrame = self:FixHealbotPlayerFrame(playerFrame) -- Raise Healbot Frame, otherwise it shows only out of range
             unusedString:SetPoint("CENTER", playerFrame, "CENTER", db.x, db.y)
             if db.classColor then
                 unusedString:SetTextColor(self:GetClassColor(playerClass))
