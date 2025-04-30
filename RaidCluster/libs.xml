@@ -10,6 +10,7 @@
     <Include file="Libs\LibSharedMedia-3.0\lib.xml"/>
     <Include file="Libs\AceGUI-3.0-SharedMediaWidgets\widget.xml"/>
     <Script file="Libs\LibDualSpec-1.0\LibDualSpec-1.0.lua"/>
+    <Script file="Libs\LibMapData-1.0\LibMapData-1.0.lua"/>
     <Script file="Libs\LibGetFrame-1.0\LibGetFrame-1.0.lua"/>
     <Script file="Libs\Pools.lua"/>
     <Include file="Libs\LibCustomGlow-1.0\LibCustomGlow-1.0.xml"/>

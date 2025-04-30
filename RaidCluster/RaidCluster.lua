@@ -457,9 +457,6 @@ function RaidCluster:StopAddon()
     self:CancelTimer(self.FPSTimer)
     self.EventHandler:UnregisterEvent("RAID_ROSTER_UPDATE")
     self.EventHandler:UnregisterEvent("PARTY_MEMBERS_CHANGED")
-    self.EventHandler:UnregisterEvent("ZONE_CHANGED")
-    self.EventHandler:UnregisterEvent("ZONE_CHANGED_INDOORS")
-    self.EventHandler:UnregisterEvent("ZONE_CHANGED_NEW_AREA")
     self:StopCLEU()
     self:FrameReseter()
     self:ResetActions()
@@ -490,10 +487,6 @@ function RaidCluster:StartAddon(Class)
             self:CreateCounterTextString(f, i)
         end
     end
-    self:MapZoneChanged()
-    self.EventHandler:RegisterEvent("ZONE_CHANGED")
-    self.EventHandler:RegisterEvent("ZONE_CHANGED_INDOORS")
-    self.EventHandler:RegisterEvent("ZONE_CHANGED_NEW_AREA")
     self.EventHandler:RegisterEvent("RAID_ROSTER_UPDATE")
     self.EventHandler:RegisterEvent("PARTY_MEMBERS_CHANGED")
     self:ParentPlayerRaidFrames()
@@ -605,8 +598,6 @@ end
 local function EventHandler(self, event, ...)
     if (event == "RAID_ROSTER_UPDATE") or (event == "PARTY_MEMBERS_CHANGED") then
         RaidCluster:ScheduleTimer("OnRosterUpdate", 1.5, event)
-    elseif (event == "ZONE_CHANGED") or (event == "ZONE_CHANGED_INDOORS") or (event == "ZONE_CHANGED_NEW_AREA") then
-        RaidCluster:ScheduleTimer("MapZoneChanged", 1)
     elseif (event == "PLAYER_TALENT_UPDATE") then
         RaidCluster:specDetection()
     end
@@ -638,9 +629,6 @@ function RaidCluster:OnInitialize()
     db = self.db.profile
     self:UpdateDB()
 
-    -- RegisterMap Sizes
-    self:RegisterMaps()
-
     -- Frame Creation
     self.EventHandler = CreateFrame("Frame")
     self.EventHandler:RegisterEvent("PLAYER_TALENT_UPDATE")
@@ -653,7 +641,6 @@ end
 
 function RaidCluster:OnEnable()
     self.playerName = UnitName("player")
-    self:MapZoneChanged()
 
     if isInit then
         RaidCluster:specDetection()
