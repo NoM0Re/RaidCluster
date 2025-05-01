@@ -97,7 +97,7 @@ function RaidCluster:GetClassColor(classFilename)
     return defaultColor, defaultColor, defaultColor, defaultColor
 end
 
---GetSpellLink
+-- GetSpellLink
 function RaidCluster:GetSpellLink(id)
     return (GetSpellLink(id) or ""):gsub("[%[%]]", "")
 end
