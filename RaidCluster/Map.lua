@@ -32,7 +32,6 @@ local function SetMap(_, _, _, x, y)
   x = (x == nil or x == 0) and 1 or x
   y = (y == nil or y == 0) and 1 or y
   RaidCluster.mapX, RaidCluster.mapY = x, y
-  print(x, y)
 end
 
 -- Map Callback
