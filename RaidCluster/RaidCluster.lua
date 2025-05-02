@@ -54,7 +54,6 @@ local db
 RaidCluster.IsInit = false
 RaidCluster.cleuIsInit = false
 RaidCluster.eventLock = false
-RaidCluster.frames = {}
 RaidCluster.currentframes = {}
 RaidCluster.frameCount = {25, 40}
 RaidCluster.Range = 0
@@ -131,55 +130,47 @@ function RaidCluster:ResetActions()
     end
 end
 
-function RaidCluster:CreateAnchorFrame()
-    local f = CreateFrame("Frame", "RaidCluster Anchor")
-    f:SetWidth(0)
-    f:SetHeight(0)
-    f:SetPoint("BOTTOMLEFT", -200, -200)
-    f:SetFrameStrata("MEDIUM")
-    f:SetFrameLevel(20)
-    f:EnableMouse(false)
-    f:EnableMouseWheel(false)
-    f:EnableJoystick(false)
-    f:Show()
-    self.parent = f
-    return f
-end
-
-function RaidCluster:CreateCounterTextString(f, i)
-    local frameName = "RaidClusterCounter" .. i
-    f.text = f:CreateFontString(frameName, "OVERLAY", "GameFontWhite")
-    f.text:SetFont(LSM:Fetch("font", db.font), db.fontSize, db.fontFlags)
-    f.text:SetText("")
-    f.text:SetTextColor(db.color.r, db.color.g, db.color.b, db.color.a)
-    f.text:SetPoint("CENTER", db.x, db.y)
-
-    self.frames[frameName] = {
-        frame = f.text,
-        inUse = false
-    }
-end
-
-function RaidCluster:GetUnusedString() -- Get next Free Text
-    for frameName, data in pairs(self.frames) do
-        if not data.inUse then
-            return self.frames[frameName].frame, frameName
-        end
+local function ResetterFunc(pool, frame)
+    if frame.text then
+        frame.text:SetText("")
+        frame.text:Hide()
     end
-    return nil
+    frame:ClearAllPoints()
+    frame:Hide()
+end
+
+function RaidCluster:InitAnchorPool()
+    if not self.anchorPool then
+        self.anchorPool = CreateFramePool("Frame", UIParent, nil, ResetterFunc)
+    end
+end
+
+local frameIndex = 0
+function RaidCluster:GetUnusedString()
+    local anchor = self.anchorPool:Acquire()
+    anchor:SetSize(1, 1)
+    anchor:SetFrameStrata("MEDIUM")
+    anchor:SetFrameLevel(170)
+    anchor:EnableMouse(false)
+    anchor:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", -200, -200)
+    anchor:SetToplevel(true)
+    anchor:Show()
+    if not anchor.text then
+        anchor.text = anchor:CreateFontString("RaidClusterCounter" .. frameIndex, "OVERLAY", "GameFontWhite")
+        frameIndex = frameIndex + 1
+    end
+    local font = LSM:Fetch("font", db.font)
+    anchor.text:SetFont(font, db.fontSize, db.fontFlags)
+    anchor.text:SetTextColor(db.color.r, db.color.g, db.color.b, db.color.a)
+    anchor.text:SetPoint("CENTER", anchor, "CENTER", 0, 0)
+    anchor.text:SetText("")
+    anchor.text:Show()
+
+    return anchor
 end
 
 function RaidCluster:FrameReseter() -- Frame reseter
-    if next(self.frames) ~= nil then
-        for _, data in pairs(self.frames) do
-            data.frame:Hide()
-            data.frame:SetText("")
-            data.frame:SetTextColor(db.color.r, db.color.g, db.color.b, db.color.a)
-            data.frame:SetParent(self.parent)
-            data.frame:SetPoint("CENTER", self.parent, "CENTER", 0, 0)
-            data.inUse = false
-        end
-    end
+    self.anchorPool:ReleaseAll()
 end
 
 function RaidCluster:UpdateFrames(results, bool)
@@ -192,7 +183,7 @@ function RaidCluster:UpdateFrames(results, bool)
         else
             if frame then
                 count = bool and tostring(#count - 1) or tostring(count)
-                frame:SetText(count)
+                frame.text:SetText(count)
                 frame:Show()
             end
         end
@@ -204,7 +195,7 @@ function RaidCluster:HidePlayerText(PlayerName) -- Hide Text for a single Player
         local frameData = self.currentframes[PlayerName] and self.currentframes[PlayerName].frame
         if frameData and frameData:IsShown() then
             frameData:Hide()
-            frameData:SetText("")
+            frameData.text:SetText("")
         end
     end
 end
@@ -342,25 +333,17 @@ function RaidCluster:CalculateGroupPlayersToGroupPlayers()
     self:UpdateFrames(playersInRangeCount, false)
 end
 
-function RaidCluster:FixHealbotPlayerFrame(frame)
-    local name = frame:GetName()
-    if not (name and name:match("^HealBot_Action_HealUnit%d+$")) then
-        return frame
-    end
-    return _G[name .. "Bar4"] or frame
-end
-
 function RaidCluster:ProcessPlayerFrame(playerName, subGroup, playerClass)
-    local unusedString, frameName = self:GetUnusedString()
-    if unusedString and frameName then
+    local unusedString = self:GetUnusedString()
+    if unusedString then
         local playerFrame = GetFrame(playerName) -- Get the Raidframe
         if playerFrame then
-            playerFrame = self:FixHealbotPlayerFrame(playerFrame) -- Raise Healbot Frame, otherwise it shows only out of range
+            unusedString:ClearAllPoints()
+            unusedString:SetParent(playerFrame)
             unusedString:SetPoint("CENTER", playerFrame, "CENTER", db.x, db.y)
             if db.classColor then
-                unusedString:SetTextColor(self:GetClassColor(playerClass))
+                unusedString.text:SetTextColor(self:GetClassColor(playerClass))
             end
-            self.frames[frameName].inUse = true
             self.currentframes[playerName] = {
                 frame = unusedString,
                 parent = playerFrame,
@@ -418,24 +401,18 @@ end
 
 function RaidCluster:ChangeApperance()
     if not db then return end
-    -- Font, FontSize, FontFlags, FontColor
-    if self.frames and next(self.frames) ~= nil then
-        for _, data in pairs(self.frames) do
-            if data.frame then
-                data.frame:SetFont(LSM:Fetch("font", db.font), db.fontSize, db.fontFlags)
-                if not db.classColor then
-                    data.frame:SetTextColor(db.color.r, db.color.g, db.color.b, db.color.a)
-                end
-            end
-        end
-    end
-    -- Postion and ClassColor
+    -- Font, FontSize, FontFlags, FontColor, Postion
     if self.currentframes and next(self.currentframes) ~= nil then
         for _, data in pairs(self.currentframes) do
-            if db.classColor then
-                data.frame:SetTextColor(self:GetClassColor(data.class))
+            if data.frame and data.frame.text then
+                data.frame.text:SetFont(LSM:Fetch("font", db.font), db.fontSize, db.fontFlags)
+                if db.classColor then
+                    data.frame.text:SetTextColor(self:GetClassColor(data.class))
+                else
+                    data.frame.text:SetTextColor(db.color.r, db.color.g, db.color.b, db.color.a)
+                end
+                data.frame:SetPoint("CENTER", data.parent, "CENTER", db.x, db.y)
             end
-            data.frame:SetPoint("CENTER", data.parent, "CENTER", db.x, db.y)
         end
     end
 end
@@ -480,12 +457,8 @@ function RaidCluster:StartAddon(Class)
         self.Range = self.ClassRanges.DRUID
         self.Action.DRUID = true
     end
-    if next(self.frames) == nil then
-        local f = RaidCluster:CreateAnchorFrame()
-        local count = db.subGroup and self.frameCount[1] or self.frameCount[2]
-        for i = 1, count do
-            self:CreateCounterTextString(f, i)
-        end
+    if not self.anchorPool then
+        RaidCluster:InitAnchorPool()
     end
     self.EventHandler:RegisterEvent("RAID_ROSTER_UPDATE")
     self.EventHandler:RegisterEvent("PARTY_MEMBERS_CHANGED")
