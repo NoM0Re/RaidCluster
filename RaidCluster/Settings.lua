@@ -119,8 +119,11 @@ RaidCluster.options = {
                     order = 1,
                     set = function(i, val)
                         db[i[#i]] = val
-                        RaidCluster:StopAddon()
-                        RaidCluster:specDetection()
+                        if val then
+                            RaidCluster:EnableAddon()
+                        else
+                            RaidCluster:DisableAddon()
+                        end
                     end,
                 },
                 Seperator = {
