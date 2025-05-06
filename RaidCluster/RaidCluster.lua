@@ -21,7 +21,6 @@ local RaidCluster = select(2, ...)
 
 -- Libs
 RaidCluster = LibStub("AceAddon-3.0"):NewAddon(RaidCluster, "RaidCluster", "AceConsole-3.0", "AceTimer-3.0")
-_G.RaidCluster = RaidCluster
 local LGF = LibStub("LibGetFrame-1.0")
 local LCG = LibStub("LibCustomGlow-1.0")
 local AC = LibStub("AceConfig-3.0")
@@ -133,15 +132,12 @@ end
 
 function RaidCluster:CreateAnchorFrame()
     local f = CreateFrame("Frame", "RaidCluster Anchor")
-    f:SetWidth(0)
-    f:SetHeight(0)
+    f:SetWidth(1)
+    f:SetHeight(1)
     f:SetPoint("BOTTOMLEFT", -200, -200)
     f:SetFrameStrata("MEDIUM")
-    f:SetFrameLevel(20)
-    f:EnableMouse(false)
-    f:EnableMouseWheel(false)
-    f:EnableJoystick(false)
-    f:Show()
+    f:SetFrameLevel(200)
+    f:Hide()
     self.parent = f
 end
 
@@ -150,17 +146,17 @@ function RaidCluster:CreateCounterFrame(index)
         self:CreateAnchorFrame()
     end
     local frameName = "RaidClusterCounter" .. index
-    local f = CreateFrame("Frame", nil, UIParent)
+    local f = CreateFrame("Frame", frameName, self.parent)
     f:SetSize(1, 1)
     f:SetFrameStrata("MEDIUM")
-    f:SetFrameLevel(170)
-    f:SetPoint("BOTTOMLEFT", self.parent, "BOTTOMLEFT", -200, -200)
+    f:SetFrameLevel(201)
+    f:SetPoint("CENTER", self.parent, "CENTER", 0, 0)
     f:SetToplevel(true)
     f:Show()
-    f.text = f:CreateFontString(frameName, "OVERLAY", "GameFontWhite")
+    f.text = f:CreateFontString(nil, "OVERLAY", "GameFontWhite")
     f.text:SetFont(LSM:Fetch("font", db.font), db.fontSize, db.fontFlags)
     f.text:SetTextColor(db.color.r, db.color.g, db.color.b, db.color.a)
-    f.text:SetPoint("CENTER", f, "CENTER", db.x, db.y)
+    f.text:SetPoint("CENTER", f, "CENTER", 0, 0)
     f.text:SetText("")
     f.text:Show()
 
@@ -176,7 +172,6 @@ function RaidCluster:GetUnusedCounter() -- Get next Free Text
             return self.frames[frameName].frame, frameName
         end
     end
-    return nil
 end
 
 function RaidCluster:FrameReseter() -- Frame reseter
@@ -354,7 +349,6 @@ function RaidCluster:ProcessPlayerFrame(playerName, subGroup, playerClass)
     if counter and frameName then
         local playerFrame = GetFrame(playerName) -- Get the Raidframe
         if playerFrame then
-            counter:ClearAllPoints()
             counter:SetParent(playerFrame)
             counter:SetPoint("CENTER", playerFrame, "CENTER", db.x, db.y)
             if db.classColor then
@@ -407,8 +401,8 @@ end
 function RaidCluster:ChangeApperance()
     if not db then return end
     -- Font, FontSize, FontFlags, FontColor
-    if self.frames and next(self.frames) ~= nil then
-        for _, data in pairs(self.frames) do
+    if self.currentframes and next(self.currentframes) ~= nil then
+        for _, data in pairs(self.currentframes) do
             if data.frame and data.frame.text then
                 data.frame.text:SetFont(LSM:Fetch("font", db.font), db.fontSize, db.fontFlags)
                 if db.classColor then
@@ -416,7 +410,9 @@ function RaidCluster:ChangeApperance()
                 else
                     data.frame.text:SetTextColor(db.color.r, db.color.g, db.color.b, db.color.a)
                 end
-                data.frame:SetPoint("CENTER", data.parent, "CENTER", db.x, db.y)
+                if data.parent then
+                    data.frame:SetPoint("CENTER", data.parent, "CENTER", db.x, db.y)
+                end
             end
         end
     end
@@ -424,7 +420,7 @@ end
 
 function RaidCluster:EventLock()
     self:StopAddon()
-    self:specDetection()
+    self:ScheduleTimer("specDetection", 0.5)
 end
 
 function RaidCluster:StartCLEU(Class)
@@ -441,9 +437,7 @@ end
 
 function RaidCluster:StopAddon()
     self.IsInit = false
-    if self.FPSTimer then
-        self:CancelTimer(self.FPSTimer)
-    end
+    self:CancelTimer(self.FPSTimer)
     self:StopCLEU()
     self:FrameReseter()
     self:ResetActions()
@@ -593,10 +587,12 @@ function RaidCluster:OnProfileChanged()
 end
 
 -- Event Handler
-local function EventHandler(self, event, ...)
+local function EventHandler(_, event, ...)
     if (event == "RAID_ROSTER_UPDATE") or (event == "PARTY_MEMBERS_CHANGED") then
-        if (self.IsInit and (not eventLock)) then
-            eventLock = RaidCluster:ScheduleTimer("EventLock", 1.5)
+        if (RaidCluster.IsInit) then
+            if not (RaidCluster:TimeLeft(eventLock)) then
+                eventLock = RaidCluster:ScheduleTimer("EventLock", 1.5)
+            end
         else
             RaidCluster:specDetection()
         end
@@ -633,7 +629,6 @@ function RaidCluster:OnInitialize()
 
     -- Frame Creation
     self.EventHandler = CreateFrame("Frame")
-    self.EventHandler:RegisterEvent("PLAYER_TALENT_UPDATE")
     self.EventHandler:SetScript("OnEvent", EventHandler)
 
     self.CLEU = CreateFrame("Frame")
@@ -644,7 +639,10 @@ end
 function RaidCluster:OnEnable()
     self.playerName = UnitName("player")
 
-    if isInit then
+    if (isInit and db and db.enabled) then
+        self.EventHandler:RegisterEvent("RAID_ROSTER_UPDATE")
+        self.EventHandler:RegisterEvent("PARTY_MEMBERS_CHANGED")
+        self.EventHandler:RegisterEvent("PLAYER_TALENT_UPDATE")
         RaidCluster:specDetection()
     end
 
@@ -656,7 +654,10 @@ end
 local function LGFStartup(...)
     isInit = true
     LGF.UnregisterCallback("RaidCluster", "GETFRAME_REFRESH")
-    if not RaidCluster.OnEnable then
+    if ((not RaidCluster.OnEnable) and db and db.enabled) then
+        RaidCluster.EventHandler:RegisterEvent("RAID_ROSTER_UPDATE")
+        RaidCluster.EventHandler:RegisterEvent("PARTY_MEMBERS_CHANGED")
+        RaidCluster.EventHandler:RegisterEvent("PLAYER_TALENT_UPDATE")
         RaidCluster:specDetection()
     end
 end
