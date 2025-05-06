@@ -51,9 +51,9 @@ local UnitInRaid = UnitInRaid
 -- Variables
 local isInit
 local db
+local eventLock = RaidCluster.eventLock
 RaidCluster.IsInit = false
-RaidCluster.cleuIsInit = false
-RaidCluster.eventLock = false
+RaidCluster.cleuInit = false
 RaidCluster.frames = {}
 RaidCluster.currentframes = {}
 RaidCluster.frameCount = {25, 40}
@@ -143,24 +143,34 @@ function RaidCluster:CreateAnchorFrame()
     f:EnableJoystick(false)
     f:Show()
     self.parent = f
-    return f
 end
 
-function RaidCluster:CreateCounterTextString(f, i)
-    local frameName = "RaidClusterCounter" .. i
+function RaidCluster:CreateCounterFrame(index)
+    if not self.parent then
+        self:CreateAnchorFrame()
+    end
+    local frameName = "RaidClusterCounter" .. index
+    local f = CreateFrame("Frame", nil, UIParent)
+    f:SetSize(1, 1)
+    f:SetFrameStrata("MEDIUM")
+    f:SetFrameLevel(170)
+    f:SetPoint("BOTTOMLEFT", self.parent, "BOTTOMLEFT", -200, -200)
+    f:SetToplevel(true)
+    f:Show()
     f.text = f:CreateFontString(frameName, "OVERLAY", "GameFontWhite")
     f.text:SetFont(LSM:Fetch("font", db.font), db.fontSize, db.fontFlags)
-    f.text:SetText("")
     f.text:SetTextColor(db.color.r, db.color.g, db.color.b, db.color.a)
-    f.text:SetPoint("CENTER", db.x, db.y)
+    f.text:SetPoint("CENTER", f, "CENTER", db.x, db.y)
+    f.text:SetText("")
+    f.text:Show()
 
     self.frames[frameName] = {
-        frame = f.text,
+        frame = f,
         inUse = false
     }
 end
 
-function RaidCluster:GetUnusedString() -- Get next Free Text
+function RaidCluster:GetUnusedCounter() -- Get next Free Text
     for frameName, data in pairs(self.frames) do
         if not data.inUse then
             return self.frames[frameName].frame, frameName
@@ -172,9 +182,7 @@ end
 function RaidCluster:FrameReseter() -- Frame reseter
     if next(self.frames) ~= nil then
         for _, data in pairs(self.frames) do
-            data.frame:Hide()
-            data.frame:SetText("")
-            data.frame:SetTextColor(db.color.r, db.color.g, db.color.b, db.color.a)
+            data.frame.text:SetText("")
             data.frame:SetParent(self.parent)
             data.frame:SetPoint("CENTER", self.parent, "CENTER", 0, 0)
             data.inUse = false
@@ -184,16 +192,15 @@ end
 
 function RaidCluster:UpdateFrames(results, bool)
     if next(self.currentframes) == nil then return end
-    local subGroupBool = db.subGroup
     for unit, count in pairs(results) do
         local frame, subGroup = self.currentframes[unit] and self.currentframes[unit].frame, self.currentframes[unit] and self.currentframes[unit].subGroup
-        if subGroupBool and subGroup and subGroup > 5 then
+        if db.subGroup and subGroup and subGroup > 5 then
             --immitate continue
         else
             if frame then
                 count = bool and tostring(#count - 1) or tostring(count)
-                frame:SetText(count)
-                frame:Show()
+                frame.text:SetText(count)
+                frame.text:Show()
             end
         end
     end
@@ -204,7 +211,7 @@ function RaidCluster:HidePlayerText(PlayerName) -- Hide Text for a single Player
         local frameData = self.currentframes[PlayerName] and self.currentframes[PlayerName].frame
         if frameData and frameData:IsShown() then
             frameData:Hide()
-            frameData:SetText("")
+            frameData.text:SetText("")
         end
     end
 end
@@ -342,27 +349,20 @@ function RaidCluster:CalculateGroupPlayersToGroupPlayers()
     self:UpdateFrames(playersInRangeCount, false)
 end
 
-function RaidCluster:FixHealbotPlayerFrame(frame)
-    local name = frame:GetName()
-    if not (name and name:match("^HealBot_Action_HealUnit%d+$")) then
-        return frame
-    end
-    return _G[name .. "Bar4"] or frame
-end
-
 function RaidCluster:ProcessPlayerFrame(playerName, subGroup, playerClass)
-    local unusedString, frameName = self:GetUnusedString()
-    if unusedString and frameName then
+    local counter, frameName = self:GetUnusedCounter()
+    if counter and frameName then
         local playerFrame = GetFrame(playerName) -- Get the Raidframe
         if playerFrame then
-            playerFrame = self:FixHealbotPlayerFrame(playerFrame) -- Raise Healbot Frame, otherwise it shows only out of range
-            unusedString:SetPoint("CENTER", playerFrame, "CENTER", db.x, db.y)
+            counter:ClearAllPoints()
+            counter:SetParent(playerFrame)
+            counter:SetPoint("CENTER", playerFrame, "CENTER", db.x, db.y)
             if db.classColor then
-                unusedString:SetTextColor(self:GetClassColor(playerClass))
+                counter.text:SetTextColor(self:GetClassColor(playerClass))
             end
             self.frames[frameName].inUse = true
             self.currentframes[playerName] = {
-                frame = unusedString,
+                frame = counter,
                 parent = playerFrame,
                 subGroup = subGroup,
                 class = playerClass
@@ -388,18 +388,6 @@ function RaidCluster:ParentPlayerRaidFrames()
     end
 end
 
-function RaidCluster:EventLock()
-    self.eventLock = false
-    self:specDetection()
-end
-
-function RaidCluster:OnRosterUpdate(event)
-    if self.eventLock then return end
-    self.eventLock = true
-    self:StopAddon()
-    self:ScheduleTimer("EventLock", 0.5)
-end
-
 function RaidCluster:OnFPSrefresh()
     if self.IsInit then
         if self.Action.PALADIN then
@@ -421,45 +409,58 @@ function RaidCluster:ChangeApperance()
     -- Font, FontSize, FontFlags, FontColor
     if self.frames and next(self.frames) ~= nil then
         for _, data in pairs(self.frames) do
-            if data.frame then
-                data.frame:SetFont(LSM:Fetch("font", db.font), db.fontSize, db.fontFlags)
-                if not db.classColor then
-                    data.frame:SetTextColor(db.color.r, db.color.g, db.color.b, db.color.a)
+            if data.frame and data.frame.text then
+                data.frame.text:SetFont(LSM:Fetch("font", db.font), db.fontSize, db.fontFlags)
+                if db.classColor then
+                    data.frame.text:SetTextColor(self:GetClassColor(data.class))
+                else
+                    data.frame.text:SetTextColor(db.color.r, db.color.g, db.color.b, db.color.a)
                 end
+                data.frame:SetPoint("CENTER", data.parent, "CENTER", db.x, db.y)
             end
-        end
-    end
-    -- Postion and ClassColor
-    if self.currentframes and next(self.currentframes) ~= nil then
-        for _, data in pairs(self.currentframes) do
-            if db.classColor then
-                data.frame:SetTextColor(self:GetClassColor(data.class))
-            end
-            data.frame:SetPoint("CENTER", data.parent, "CENTER", db.x, db.y)
         end
     end
 end
 
+function RaidCluster:EventLock()
+    self:StopAddon()
+    self:specDetection()
+end
+
 function RaidCluster:StartCLEU(Class)
-    self.cleuIsInit = true
+    self.cleuInit = true
     self.CLEU:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
     self.CLEU:SetScript("OnEvent", cleuFunctions[Class])
 end
 
 function RaidCluster:StopCLEU()
-    self.cleuIsInit = false
+    self.cleuInit = false
     self.CLEU:UnregisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
     self.CLEU:SetScript("OnEvent", nil)
 end
 
 function RaidCluster:StopAddon()
     self.IsInit = false
-    self:CancelTimer(self.FPSTimer)
-    self.EventHandler:UnregisterEvent("RAID_ROSTER_UPDATE")
-    self.EventHandler:UnregisterEvent("PARTY_MEMBERS_CHANGED")
+    if self.FPSTimer then
+        self:CancelTimer(self.FPSTimer)
+    end
     self:StopCLEU()
     self:FrameReseter()
     self:ResetActions()
+end
+
+function RaidCluster:DisableAddon()
+    self:StopAddon()
+    self.EventHandler:UnregisterEvent("RAID_ROSTER_UPDATE")
+    self.EventHandler:UnregisterEvent("PARTY_MEMBERS_CHANGED")
+    self.EventHandler:UnregisterEvent("PLAYER_TALENT_UPDATE")
+end
+
+function RaidCluster:EnableAddon()
+    self.EventHandler:RegisterEvent("RAID_ROSTER_UPDATE")
+    self.EventHandler:RegisterEvent("PARTY_MEMBERS_CHANGED")
+    self.EventHandler:RegisterEvent("PLAYER_TALENT_UPDATE")
+    self:specDetection()
 end
 
 function RaidCluster:StartAddon(Class)
@@ -481,14 +482,11 @@ function RaidCluster:StartAddon(Class)
         self.Action.DRUID = true
     end
     if next(self.frames) == nil then
-        local f = RaidCluster:CreateAnchorFrame()
         local count = db.subGroup and self.frameCount[1] or self.frameCount[2]
         for i = 1, count do
-            self:CreateCounterTextString(f, i)
+            self:CreateCounterFrame(i)
         end
     end
-    self.EventHandler:RegisterEvent("RAID_ROSTER_UPDATE")
-    self.EventHandler:RegisterEvent("PARTY_MEMBERS_CHANGED")
     self:ParentPlayerRaidFrames()
     self.FPSTimer = self:ScheduleRepeatingTimer("OnFPSrefresh", db.update or 1)
 end
@@ -501,7 +499,7 @@ function RaidCluster:specDetection()
         if not (RaidFrame or PixelGlow) then return end
         local talents = self:FindTalentPosition(Class, db.paladinTalents)
         if talents then
-            if (not self.cleuIsInit) and PixelGlow then
+            if (not self.cleuInit) and PixelGlow then
                 self:StartCLEU(Class)
             end
             if (not self.IsInit) and RaidFrame then
@@ -511,7 +509,7 @@ function RaidCluster:specDetection()
             if self.IsInit then
                 self:StopAddon()
             end
-            if self.cleuIsInit then
+            if self.cleuInit then
                 self:StopCLEU()
             end
         end
@@ -520,7 +518,7 @@ function RaidCluster:specDetection()
         if not (RaidFrame or PixelGlow) then return end
         local talents = self:FindTalentPosition(Class, db.shamanTalents)
         if talents then
-            if (not self.cleuIsInit) and PixelGlow then
+            if (not self.cleuInit) and PixelGlow then
                 self:StartCLEU(Class)
             end
             if (not self.IsInit) and RaidFrame then
@@ -530,7 +528,7 @@ function RaidCluster:specDetection()
             if self.IsInit then
                 self:StopAddon()
             end
-            if self.cleuIsInit then
+            if self.cleuInit then
                 self:StopCLEU()
             end
         end
@@ -540,14 +538,14 @@ function RaidCluster:specDetection()
         local htalents = self:FindTalentPosition(Class, db.holyPriestTalents)
         local dtalents = self:FindTalentPosition(Class, db.discoPriestTalents)
         if htalents then
-            if (not self.cleuIsInit) and hPixelGlow then
+            if (not self.cleuInit) and hPixelGlow then
                 self:StartCLEU("HPRIEST")
             end
             if (not self.IsInit) and hRaidFrame then
                 self:StartAddon("HPRIEST")
             end
         elseif dtalents then
-            if (not self.cleuIsInit) and dPixelGlow then
+            if (not self.cleuInit) and dPixelGlow then
                 self:StartCLEU("DPRIEST")
             end
             if (not self.IsInit) and dRaidFrame then
@@ -557,7 +555,7 @@ function RaidCluster:specDetection()
             if self.IsInit then
                 self:StopAddon()
             end
-            if self.cleuIsInit then
+            if self.cleuInit then
                 self:StopCLEU()
             end
         end
@@ -566,7 +564,7 @@ function RaidCluster:specDetection()
         if not (RaidFrame or PixelGlow) then return end
         local talents = self:FindTalentPosition(Class, db.druidTalents)
         if talents then
-            if (not self.cleuIsInit) and PixelGlow then
+            if (not self.cleuInit) and PixelGlow then
                 self:StartCLEU(Class)
             end
             if (not self.IsInit) and RaidFrame then
@@ -576,7 +574,7 @@ function RaidCluster:specDetection()
             if self.IsInit then
                 self:StopAddon()
             end
-            if self.cleuIsInit then
+            if self.cleuInit then
                 self:StopCLEU()
             end
         end
@@ -597,7 +595,11 @@ end
 -- Event Handler
 local function EventHandler(self, event, ...)
     if (event == "RAID_ROSTER_UPDATE") or (event == "PARTY_MEMBERS_CHANGED") then
-        RaidCluster:ScheduleTimer("OnRosterUpdate", 1.5, event)
+        if (self.IsInit and (not eventLock)) then
+            eventLock = RaidCluster:ScheduleTimer("EventLock", 1.5)
+        else
+            RaidCluster:specDetection()
+        end
     elseif (event == "PLAYER_TALENT_UPDATE") then
         RaidCluster:specDetection()
     end
