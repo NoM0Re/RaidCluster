@@ -637,16 +637,17 @@ function RaidCluster:OnInitialize()
 end
 
 function RaidCluster:OnEnable()
-    self.playerName = UnitName("player")
-
-    if (isInit and db and db.enabled) then
-        self.EventHandler:RegisterEvent("RAID_ROSTER_UPDATE")
-        self.EventHandler:RegisterEvent("PARTY_MEMBERS_CHANGED")
-        self.EventHandler:RegisterEvent("PLAYER_TALENT_UPDATE")
-        RaidCluster:specDetection()
+    if (isInit) then
+        self.playerName = UnitName("player")
+        if (db and db.enabled) then
+            self.EventHandler:RegisterEvent("RAID_ROSTER_UPDATE")
+            self.EventHandler:RegisterEvent("PARTY_MEMBERS_CHANGED")
+            self.EventHandler:RegisterEvent("PLAYER_TALENT_UPDATE")
+            RaidCluster:specDetection()
+            print(1)
+        end
+        RaidCluster.OnEnable = nil
     end
-
-    self.OnEnable = nil
 end
 
 -- This is tricky first we need to init LibGetFrame, it needs some time to be ready,
@@ -654,12 +655,7 @@ end
 local function LGFStartup(...)
     isInit = true
     LGF.UnregisterCallback("RaidCluster", "GETFRAME_REFRESH")
-    if ((not RaidCluster.OnEnable) and db and db.enabled) then
-        RaidCluster.EventHandler:RegisterEvent("RAID_ROSTER_UPDATE")
-        RaidCluster.EventHandler:RegisterEvent("PARTY_MEMBERS_CHANGED")
-        RaidCluster.EventHandler:RegisterEvent("PLAYER_TALENT_UPDATE")
-        RaidCluster:specDetection()
-    end
+    RaidCluster:OnEnable()
 end
 LGF.RegisterCallback("RaidCluster", "GETFRAME_REFRESH", LGFStartup)
 LGF:ScanForUnitFrames()
