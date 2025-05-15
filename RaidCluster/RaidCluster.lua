@@ -644,7 +644,6 @@ function RaidCluster:OnEnable()
             self.EventHandler:RegisterEvent("PARTY_MEMBERS_CHANGED")
             self.EventHandler:RegisterEvent("PLAYER_TALENT_UPDATE")
             RaidCluster:specDetection()
-            print(1)
         end
         RaidCluster.OnEnable = nil
     end
