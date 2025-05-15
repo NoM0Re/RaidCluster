@@ -50,7 +50,6 @@ local UnitInRaid = UnitInRaid
 -- Variables
 local isInit
 local db
-local eventLock = RaidCluster.eventLock
 RaidCluster.IsInit = false
 RaidCluster.cleuInit = false
 RaidCluster.frames = {}
@@ -147,11 +146,9 @@ function RaidCluster:CreateCounterFrame(index)
     end
     local frameName = "RaidClusterCounter" .. index
     local f = CreateFrame("Frame", frameName, self.parent)
-    f:SetSize(1, 1)
-    f:SetFrameStrata("MEDIUM")
+    f:SetSize(5, 5)
+    f:SetFrameStrata("HIGH")
     f:SetFrameLevel(201)
-    f:SetPoint("CENTER", self.parent, "CENTER", 0, 0)
-    f:SetToplevel(true)
     f:Show()
     f.text = f:CreateFontString(nil, "OVERLAY", "GameFontWhite")
     f.text:SetFont(LSM:Fetch("font", db.font), db.fontSize, db.fontFlags)
@@ -350,7 +347,10 @@ function RaidCluster:ProcessPlayerFrame(playerName, subGroup, playerClass)
         local playerFrame = GetFrame(playerName) -- Get the Raidframe
         if playerFrame then
             counter:SetParent(playerFrame)
+            counter:ClearAllPoints()
             counter:SetPoint("CENTER", playerFrame, "CENTER", db.x, db.y)
+            counter:SetFrameLevel(playerFrame:GetFrameLevel() + 100)
+            counter:SetToplevel(true)
             if db.classColor then
                 counter.text:SetTextColor(self:GetClassColor(playerClass))
             end
@@ -368,7 +368,7 @@ end
 function RaidCluster:ParentPlayerRaidFrames()
     self.currentframes = {}
     local Members = GetNumRaidMembers()
-    if not Members or Members < 1 then return end
+    if not Members or Members == 0 then return end
 
     for i = 1, Members do
         local playerName, _, subGroup, _, _, playerClass = GetRaidRosterInfo(i)
@@ -411,6 +411,7 @@ function RaidCluster:ChangeApperance()
                     data.frame.text:SetTextColor(db.color.r, db.color.g, db.color.b, db.color.a)
                 end
                 if data.parent then
+                    data.frame:ClearAllPoints()
                     data.frame:SetPoint("CENTER", data.parent, "CENTER", db.x, db.y)
                 end
             end
@@ -590,8 +591,8 @@ end
 local function EventHandler(_, event, ...)
     if (event == "RAID_ROSTER_UPDATE") or (event == "PARTY_MEMBERS_CHANGED") then
         if (RaidCluster.IsInit) then
-            if not (RaidCluster:TimeLeft(eventLock)) then
-                eventLock = RaidCluster:ScheduleTimer("EventLock", 1.5)
+            if not RaidCluster:TimeLeft(RaidCluster.eventLock) then
+                RaidCluster.eventLock = RaidCluster:ScheduleTimer("EventLock", 1.5)
             end
         else
             RaidCluster:specDetection()
