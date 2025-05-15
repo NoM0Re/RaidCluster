@@ -208,7 +208,7 @@ function RaidCluster:HidePlayerText(PlayerName) -- Hide Text for a single Player
   if self.currentframes and next(self.currentframes) ~= nil then
     local frameData = self.currentframes[PlayerName] and self.currentframes[PlayerName].frame
     if frameData and frameData:IsShown() then
-      frameData:Hide()
+      frameData.text:Hide()
       frameData.text:SetText("")
     end
   end
