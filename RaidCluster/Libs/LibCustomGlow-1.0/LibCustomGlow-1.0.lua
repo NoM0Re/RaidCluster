@@ -16,6 +16,10 @@ local ceil, floor, min, mod = math.ceil, math.floor, math.min, mod
 local tinsert, tremove = table.insert, table.remove
 
 -- ===============================================================================
+-- !!! IMPORTANT: Requires Pools.lua to be loaded before this file !!!
+-- ===============================================================================
+
+-- ===============================================================================
 -- !!! IMPORTANT: CHANGE `texturePath` BELOW TO POINT TO YOUR ADDON'S FILE LOCATION !!!
 -- DON'T FORGET THE BACKSLASH AT THE END (\)!
 -- Example: local texturePath = [[Interface\AddOns\YourAddon\Libs\]]
@@ -43,7 +47,7 @@ local TexPoolResetter = function(pool, tex)
   tex:Hide()
   tex:ClearAllPoints()
 end
-local GlowTexPool = CreateTexturePool(GlowParent, "ARTWORK", nil, TexPoolResetter)
+local GlowTexPool = CreateTexturePool(GlowParent, "ARTWORK", nil, nil, TexPoolResetter)
 lib.GlowTexPool = GlowTexPool
 
 local FramePoolResetter = function(framePool, frame)
@@ -933,7 +937,7 @@ local function ProcGlowResetter(framePool, frame)
   end
 end
 
-local ProcGlowPool = CreateFramePool("Frame", GlowParent, nil, ProcGlowResetter)
+local ProcGlowPool = CreateFramePool("Frame", GlowParent, "", ProcGlowResetter)
 lib.ProcGlowPool = ProcGlowPool
 
 local function InitProcGlow(f)

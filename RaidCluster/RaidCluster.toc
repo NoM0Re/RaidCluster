@@ -1,7 +1,7 @@
 ## Interface: 30300
 ## Title: RaidCluster
 ## Notes: Shows Clusters on the Raidframe.
-## Version: 1.0.1
+## Version: 1.1.0
 ## Author: NoM0Re
 ## DefaultState: enabled
 ## SavedVariables: RaidCluster_DB
@@ -12,4 +12,21 @@ libs.xml
 Util.lua
 Map.lua
 RaidCluster.lua
+Modernize.lua
+Locales\enUS.lua
+Locales\deDE.lua
+Locales\esES.lua
+Locales\esMX.lua
+Locales\frFR.lua
+Locales\itIT.lua
+Locales\koKR.lua
+Locales\ptBR.lua
+Locales\ruRU.lua
+Locales\zhCN.lua
+Locales\zhTW.lua
 Settings.lua
+Frames.lua
+Range.lua
+Glow.lua
+Test.lua
+Runtime.lua

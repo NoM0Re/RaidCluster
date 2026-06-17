@@ -1,7 +1,7 @@
 --[[-----------------------------------------------------------------------------
 Frame Container
 -------------------------------------------------------------------------------]]
-local Type, Version = "Frame", 21
+local Type, Version = "Frame", 31
 local AceGUI = LibStub and LibStub("AceGUI-3.0", true)
 if not AceGUI or (AceGUI:GetWidgetVersion(Type) or 0) >= Version then return end
 
@@ -13,16 +13,16 @@ local wipe = table.wipe
 local PlaySound = PlaySound
 local CreateFrame, UIParent = CreateFrame, UIParent
 
--- Global vars/functions that we don't upvalue since they might get hooked, or upgraded
--- List them here for Mikk's FindGlobals script
--- GLOBALS: CLOSE
-
 --[[-----------------------------------------------------------------------------
 Scripts
 -------------------------------------------------------------------------------]]
 local function Button_OnClick(frame)
 	PlaySound("gsTitleOptionExit")
 	frame.obj:Hide()
+end
+
+local function Frame_OnShow(frame)
+	frame.obj:Fire("OnShow")
 end
 
 local function Frame_OnClose(frame)
@@ -79,10 +79,12 @@ local methods = {
 	["OnAcquire"] = function(self)
 		self.frame:SetParent(UIParent)
 		self.frame:SetFrameStrata("FULLSCREEN_DIALOG")
+		self.frame:SetFrameLevel(100) -- Lots of room to draw under it
 		self:SetTitle()
 		self:SetStatusText()
 		self:ApplyStatus()
 		self:Show()
+        self:EnableResize(true)
 	end,
 
 	["OnRelease"] = function(self)
@@ -112,6 +114,7 @@ local methods = {
 
 	["SetTitle"] = function(self, title)
 		self.titletext:SetText(title)
+		self.titlebg:SetWidth((self.titletext:GetWidth() or 0) + 10)
 	end,
 
 	["SetStatusText"] = function(self, text)
@@ -124,6 +127,13 @@ local methods = {
 
 	["Show"] = function(self)
 		self.frame:Show()
+	end,
+
+	["EnableResize"] = function(self, state)
+		local func = state and "Show" or "Hide"
+		self.sizer_se[func](self.sizer_se)
+		self.sizer_s[func](self.sizer_s)
+		self.sizer_e[func](self.sizer_e)
 	end,
 
 	-- called to set an external table to store status in
@@ -166,17 +176,23 @@ local PaneBackdrop  = {
 }
 
 local function Constructor()
-	local frame = CreateFrame("Frame", nil, UIParent)
+	local frame = CreateFrame("Frame", string.format("%s%d", Type, AceGUI:GetNextWidgetNum(Type)), UIParent)
 	frame:Hide()
 
 	frame:EnableMouse(true)
 	frame:SetMovable(true)
 	frame:SetResizable(true)
 	frame:SetFrameStrata("FULLSCREEN_DIALOG")
+	frame:SetFrameLevel(100) -- Lots of room to draw under it
 	frame:SetBackdrop(FrameBackdrop)
 	frame:SetBackdropColor(0, 0, 0, 1)
-	frame:SetMinResize(400, 200)
+	if frame.SetResizeBounds then -- WoW 10.0
+		frame:SetResizeBounds(400, 200)
+	else
+		frame:SetMinResize(400, 200)
+	end
 	frame:SetToplevel(true)
+	frame:SetScript("OnShow", Frame_OnShow)
 	frame:SetScript("OnHide", Frame_OnClose)
 	frame:SetScript("OnMouseDown", Frame_OnMouseDown)
 
@@ -255,7 +271,7 @@ local function Constructor()
 	line2:SetHeight(8)
 	line2:SetPoint("BOTTOMRIGHT", -8, 8)
 	line2:SetTexture("Interface\\Tooltips\\UI-Tooltip-Border")
-	local x = 0.1 * 8/17
+	x = 0.1 * 8/17
 	line2:SetTexCoord(0.05 - x, 0.5, 0.05, 0.5 + x, 0.05, 0.5 - x, 0.5 + x, 0.5)
 
 	local sizer_s = CreateFrame("Frame", nil, frame)
@@ -283,6 +299,10 @@ local function Constructor()
 		localstatus = {},
 		titletext   = titletext,
 		statustext  = statustext,
+		titlebg     = titlebg,
+		sizer_se    = sizer_se,
+		sizer_s     = sizer_s,
+		sizer_e     = sizer_e,
 		content     = content,
 		frame       = frame,
 		type        = Type

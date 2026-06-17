@@ -18,7 +18,6 @@
 
 -- This file contains MapSizes and registers them into a table, also Helper Functions.
 
-local AddonName = ...
 local RaidCluster = select(2, ...)
 
 -- Libs
@@ -26,12 +25,17 @@ local MapSizes = LibStub("LibMapData-1.0");
 
 -- Variables
 RaidCluster.mapX, RaidCluster.mapY = 1, 1
+RaidCluster.mapReady = false
 
 -- Callback Function
 local function SetMap(_, _, _, x, y)
   x = (x == nil or x == 0) and 1 or x
   y = (y == nil or y == 0) and 1 or y
   RaidCluster.mapX, RaidCluster.mapY = x, y
+  RaidCluster.mapReady = x > 1 and y > 1
+  if RaidCluster.QueueStartup then
+    RaidCluster:QueueStartup(0.2)
+  end
 end
 
 -- Map Callback

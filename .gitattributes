@@ -13,13 +13,13 @@
 
 # GitHub
 .github         text
-.gitattributes  text
+.gitattributes  text eol=lf
 *.md            text
 
 # Source files
-*.lua           text
-*.xml           text
-*.toc           text
+*.lua           text eol=lf
+*.xml           text eol=lf
+*.toc           text eol=lf
 
 # Fonts
 *.ttf           binary

@@ -20,6 +20,12 @@
 
 local AddonName = ...
 local RaidCluster = select(2, ...)
+local L = RaidCluster.L or setmetatable({}, {
+  __index = function(_, key)
+    return key
+  end,
+})
+RaidCluster.L = L
 
 -- Libs
 local LSM = LibStub("LibSharedMedia-3.0")
@@ -28,36 +34,215 @@ local fonts = LSM:HashTable("font")
 -- WoW Api
 local GetAddOnMetadata = GetAddOnMetadata
 
--- Fixes Profile Defaults, if some are missing
-function RaidCluster:FixProfileDefaults(profile, defaults)
-  for key, defaultValue in pairs(defaults) do
-    local currentValue = profile[key]
-
-    if type(defaultValue) == "table" then
-      if (key == "color" or key == "glowColor") and type(currentValue) ~= "table" then
-        profile[key] = CopyTable(defaultValue)
-      elseif type(currentValue) ~= "table" then
-        profile[key] = CopyTable(defaultValue)
-      end
-    else
-      if currentValue == nil then
-        profile[key] = defaultValue
-      end
-    end
-  end
-end
-
 -- Always reference to the current profile
 local db
 function RaidCluster:UpdateDB()
   db = self.db.profile
 end
 
+local function RestartAddon()
+  RaidCluster:StopAddon()
+  RaidCluster:specDetection()
+end
+
+local function SetAndRestart(info, value)
+  db[info[#info]] = value
+  RestartAddon()
+end
+
+local function SetAndRefreshAppearance(info, value)
+  db[info[#info]] = value
+  RaidCluster:ChangeAppearance()
+end
+
+local function BuildSpecOptions(def, orderOffset)
+  local args = {}
+  orderOffset = orderOffset or 0
+
+  args[def.enabled] = {
+    type = "toggle",
+    name = ENABLE,
+    width = "full",
+    order = orderOffset + 1,
+    set = SetAndRestart,
+  }
+  args[def.counter] = {
+    type = "toggle",
+    name = L["Enable Counter"],
+    order = orderOffset + 2,
+    set = SetAndRestart,
+  }
+  args[def.key .. "CounterDesc"] = {
+    type = "description",
+    name = def.counterDesc,
+    order = orderOffset + 3,
+    fontSize = "small",
+  }
+  args[def.glow] = {
+    type = "toggle",
+    name = L["Enable Glow"],
+    order = orderOffset + 4,
+    set = SetAndRestart,
+  }
+  args[def.key .. "GlowDesc"] = {
+    type = "description",
+    name = def.glowDesc,
+    order = orderOffset + 5,
+    fontSize = "small",
+  }
+  args[def.raid] = {
+    type = "toggle",
+    name = L["Only in Raid"],
+    width = "full",
+    order = orderOffset + 6,
+    set = SetAndRestart,
+  }
+  args[def.party] = {
+    type = "toggle",
+    name = L["Only in Party"],
+    width = "full",
+    order = orderOffset + 7,
+    set = SetAndRestart,
+  }
+  args[def.key .. "Activation"] = {
+    type = "header",
+    name = L["Activation"],
+    order = orderOffset + 8,
+  }
+  args[def.talent] = {
+    type = "select",
+    name = L["Talent"],
+    order = orderOffset + 9,
+    values = function()
+      return RaidCluster:genTalentDropdown(def.talentClass)
+    end,
+    set = function(i, val)
+      db[i[#i]] = val
+      RestartAddon()
+    end,
+  }
+  args[def.key .. "TalentDesc"] = {
+    type = "description",
+    name = def.talentDesc,
+    order = orderOffset + 10,
+    fontSize = "small",
+  }
+
+  return args
+end
+
+local function MergeOptions(target, source)
+  for key, value in pairs(source) do
+    target[key] = value
+  end
+end
+
+local function BuildClassOptions(name, order, specs)
+  local args = {}
+
+  for index, spec in ipairs(specs) do
+    local offset = (index - 1) * 100
+    if spec.header then
+      args[spec.key .. "Header"] = {
+        type = "header",
+        name = L[spec.header],
+        order = offset,
+      }
+    end
+    MergeOptions(args, BuildSpecOptions(spec, offset))
+  end
+
+  return {
+    type = "group",
+    name = L[name],
+    order = order,
+    get = function(i)
+      return db[i[#i]]
+    end,
+    set = function(i, val)
+      db[i[#i]] = val
+    end,
+    args = args,
+  }
+end
+
+local SPEC_OPTIONS = {
+  paladin = {
+    key = "paladin",
+    talentClass = "PALADIN",
+    enabled = "paladinEnable",
+    raid = "paladinEnableInRaid",
+    party = "paladinEnableInParty",
+    counter = "paladinRaidFrameEnable",
+    glow = "paladinGlowEnable",
+    talent = "paladinTalents",
+    counterDesc = L["Displays the number of players in range for %s."]:format(RaidCluster:GetSpellLink(55121)),
+    glowDesc = L["Glows players that you healed with %s."]:format(RaidCluster:GetSpellLink(55121)),
+    talentDesc = L["Select the talent that identifies when this Paladin setup should be active."],
+  },
+  shaman = {
+    key = "shaman",
+    talentClass = "SHAMAN",
+    enabled = "shamanEnable",
+    raid = "shamanEnableInRaid",
+    party = "shamanEnableInParty",
+    counter = "shamanRaidFrameEnable",
+    glow = "shamanGlowEnable",
+    talent = "shamanTalents",
+    counterDesc = L["Displays the number of players in range for %s."]:format(RaidCluster:GetSpellLink(55459)) ..
+      "\n" .. L["Shows players with less than 100% health and chained together."],
+    glowDesc = L["Glows players that you healed with %s."]:format(RaidCluster:GetSpellLink(55459)),
+    talentDesc = L["Select the talent that identifies when this Shaman setup should be active."],
+  },
+  discipline = {
+    key = "discoPriest",
+    header = "Discipline",
+    talentClass = "PRIEST",
+    enabled = "discoPriestEnable",
+    raid = "discoPriestEnableInRaid",
+    party = "discoPriestEnableInParty",
+    counter = "discoPriestRaidFrameEnable",
+    glow = "discoPriestGlowEnable",
+    talent = "discoPriestTalents",
+    counterDesc = L["Displays the number of players in group in range for %s."]:format(RaidCluster:GetSpellLink(48072)),
+    glowDesc = L["Glows players that you healed with %s."]:format(RaidCluster:GetSpellLink(48072)),
+    talentDesc = L["Select the talent that identifies when this Discipline setup should be active."],
+  },
+  holy = {
+    key = "holyPriest",
+    header = "Holy",
+    talentClass = "PRIEST",
+    enabled = "holyPriestEnable",
+    raid = "holyPriestEnableInRaid",
+    party = "holyPriestEnableInParty",
+    counter = "holyPriestRaidFrameEnable",
+    glow = "holyPriestGlowEnable",
+    talent = "holyPriestTalents",
+    counterDesc = L["Displays the number of players in range for %s."]:format(RaidCluster:GetSpellLink(48089)),
+    glowDesc = L["Glows players that you healed with %s."]:format(RaidCluster:GetSpellLink(48089)),
+    talentDesc = L["Select the talent that identifies when this Holy setup should be active."],
+  },
+  druid = {
+    key = "druid",
+    talentClass = "DRUID",
+    enabled = "druidEnable",
+    raid = "druidEnableInRaid",
+    party = "druidEnableInParty",
+    counter = "druidRaidFrameEnable",
+    glow = "druidGlowEnable",
+    talent = "druidTalents",
+    counterDesc = L["Displays the number of players in range for %s."]:format(RaidCluster:GetSpellLink(53251)),
+    glowDesc = L["Glows players that you healed with %s."]:format(RaidCluster:GetSpellLink(53251)),
+    talentDesc = L["Select the talent that identifies when this Druid setup should be active."],
+  },
+}
+
 -- Default Settings
 RaidCluster.defaults = {
   profile = {
     enabled = true,
     update = 0.6,
+    rangeChecksPerFrame = 220,
     subGroup = true,
     x = 0,
     y = 0,
@@ -67,27 +252,47 @@ RaidCluster.defaults = {
     fontFlags = "OUTLINE",
     fontSize = 14,
     glowColorEnable = false,
+    glowType = "Pixel Glow",
     glowColor = { r = 0.95, g = 0.95, b = 0.32, a = 1 },
     lines = 10,
     frequency = 0.25,
+    glowScale = 1,
     length = 16,
     thickness = 1,
+    border = false,
     xOffset = 0,
     yOffset = 0,
+    procGlowDuration = 1,
+    procGlowStartAnim = true,
+    paladinEnable = true,
+    paladinEnableInRaid = true,
+    paladinEnableInParty = true,
     paladinRaidFrameEnable = true,
-    paladinPixelGlowEnable = true,
+    paladinGlowEnable = true,
     paladinTalents = 53563,
+    shamanEnable = true,
+    shamanEnableInRaid = true,
+    shamanEnableInParty = true,
     shamanRaidFrameEnable = true,
-    shamanPixelGlowEnable = true,
+    shamanGlowEnable = true,
     shamanTalents = 974,
+    holyPriestEnable = true,
+    holyPriestEnableInRaid = true,
+    holyPriestEnableInParty = true,
     holyPriestRaidFrameEnable = true,
-    holyPriesPixelGlowEnable = true,
+    holyPriestGlowEnable = true,
     holyPriestTalents = 34861,
+    discoPriestEnable = true,
+    discoPriestEnableInRaid = true,
+    discoPriestEnableInParty = true,
     discoPriestRaidFrameEnable = true,
-    discoPriesPixelGlowEnable = true,
+    discoPriestGlowEnable = true,
     discoPriestTalents = 10060,
+    druidEnable = true,
+    druidEnableInRaid = true,
+    druidEnableInParty = true,
     druidRaidFrameEnable = true,
-    druidPixelGlowEnable = true,
+    druidGlowEnable = true,
     druidTalents = 48438,
   }
 }
@@ -95,16 +300,16 @@ RaidCluster.defaults = {
 -- Options Table
 RaidCluster.options = {
   type = "group",
-  name = "Raid Cluster",
+  name = L["Raid Cluster"],
   args = {
     github = {
       type = "header",
-      name = "Github: |c007289d9" .. GetAddOnMetadata(AddonName, "X-Website") .. "|r",
+      name = L["Github: |c007289d9%s|r"]:format(GetAddOnMetadata(AddonName, "X-Website")),
       order = 0
     },
     General = {
       type = "group",
-      name = "General",
+      name = L["General"],
       order = 1,
       get = function(i)
         return db[i[#i]]
@@ -115,7 +320,7 @@ RaidCluster.options = {
       args = {
         enabled = {
           type = "toggle",
-          name = "Enable Addon",
+          name = L["Enable Addon"],
           order = 1,
           set = function(i, val)
             db[i[#i]] = val
@@ -126,7 +331,7 @@ RaidCluster.options = {
             end
           end,
         },
-        Seperator = {
+        Separator = {
           type = "description",
           name = " ",
           fontSize = "small",
@@ -134,52 +339,58 @@ RaidCluster.options = {
         },
         update = {
           type = "range",
-          name = "Update Frequenzy",
+          name = L["Update Frequency"],
           order = 3,
           min = 0.4,
           softMax = 2,
           step = 0.05,
-          set = function(i, val)
-            db[i[#i]] = val
-            RaidCluster:StopAddon()
-            RaidCluster:specDetection()
-          end,
+          set = SetAndRestart,
         },
         desc = {
           type = "description",
-          name = "The lower it is, the more performance it requires.",
+          name = L["How often counters are recalculated. Lower values update faster and cost more CPU."],
           order = 4,
           fontSize = "small",
         },
-        Seperator2 = {
-          type = "description",
-          name = " ",
-          fontSize = "small",
+        rangeChecksPerFrame = {
+          type = "range",
+          name = L["Range Checks / Frame"],
           order = 5,
+          min = 40,
+          softMax = 800,
+          step = 20,
+          desc = L["Spreads range work over frames. Higher values finish faster but can spike more."],
+        },
+        Separator2 = {
+          type = "description",
+          name = L["Limits how many range comparisons are processed per rendered frame. Lower values reduce spikes but may make counter updates finish later."],
+          fontSize = "small",
+          order = 6,
         },
         subGroup = {
-          name = "Only Groups 1-5",
+          name = L["Raid: Only Groups 1-5"],
           type = "toggle",
           width = "full",
-          order = 6,
-          confirm = true,
-          confirmText = "Requires UI reloading.",
+          order = 7,
           set = function(i, val)
             db[i[#i]] = val
-            ReloadUI()
+            RaidCluster:CancelRangeJob()
+            RaidCluster:ReleaseCounters()
+            RaidCluster:ResetFrameBindings()
+            RaidCluster:specDetection()
           end
         },
         desc2 = {
           type = "description",
-          name = "Only saves a very small amount of performance.",
-          order = 7,
+          name = L["Raid-only filter. Party mode always uses player and party members."],
+          order = 8,
           fontSize = "small",
         },
       },
     },
     Appearance = {
       type = "group",
-      name = "Apperance",
+      name = L["Appearance"],
       order = 2,
       get = function(i)
         return db[i[#i]]
@@ -190,70 +401,61 @@ RaidCluster.options = {
       args = {
         raidframes = {
           type = "group",
-          name = "Raid Frames Apperance",
+          name = L["Counter Appearance"],
           order = 1,
           inline = true,
           args = {
             x = {
               type = "range",
-              name = "X Position",
+              name = L["X Offset"],
               order = 1,
               min = -100,
               softMax = 100,
               step = 0.25,
-              set = function(i, val)
-                db[i[#i]] = val
-                RaidCluster:ChangeApperance()
-              end
+              set = SetAndRefreshAppearance,
             },
             y = {
               type = "range",
-              name = "Y Position",
+              name = L["Y Offset"],
               order = 2,
               min = -100,
               softMax = 100,
               step = 0.25,
-              set = function(i, val)
-                db[i[#i]] = val
-                RaidCluster:ChangeApperance()
-              end
+              set = SetAndRefreshAppearance,
             },
             classColor = {
               type = "toggle",
-              name = "  ClassColor",
+              name = L["Class Color"],
               order = 3,
-              set = function(i, val)
-                db[i[#i]] = val
-                RaidCluster:ChangeApperance()
-              end
+              set = SetAndRefreshAppearance,
             },
             color = {
               type = "color",
-              name = "Color",
+              name = L["Color"],
               order = 4,
               hasAlpha = true,
+              hidden = function()
+                return db.classColor
+              end,
               get = function()
                 return db.color.r, db.color.g, db.color.b, db.color.a
               end,
               set = function(_, r, g, b, a)
                 db.color.r, db.color.g, db.color.b, db.color.a = r, g, b, a
-                RaidCluster:ChangeApperance()
+                RaidCluster:ChangeAppearance()
               end
             },
             font = {
               type = "select",
-              name = "Font",
+              name = L["Font"],
               order = 5,
               values = fonts,
               dialogControl = "LSM30_Font",
-              set = function(i, val)
-                db[i[#i]] = val
-                RaidCluster:ChangeApperance()
-              end
+              set = SetAndRefreshAppearance,
             },
             fontFlags = {
               type = "select",
-              name = "Font Outline",
+              name = L["Font Outline"],
               order = 6,
               values = {
                 [""] = NONE,
@@ -263,388 +465,187 @@ RaidCluster.options = {
                 ["MONOCHROME"] = "Monochrome",
                 ["OUTLINEMONOCHROME"] = "Outlined Monochrome"
               },
-              set = function(i, val)
-                db[i[#i]] = val
-                RaidCluster:ChangeApperance()
-              end
+              set = SetAndRefreshAppearance,
             },
             fontSize = {
               type = "range",
-              name = "Font Size",
+              name = L["Font Size"],
               order = 7,
               min = 6,
               softMax = 72,
               step = 1,
-              set = function(i, val)
-                db[i[#i]] = val
-                RaidCluster:ChangeApperance()
-              end
+              set = SetAndRefreshAppearance,
             },
           },
         },
-        pixelglow = {
+        glow = {
           type = "group",
-          name = "Pixel Glow Apperance",
+          name = L["Glow Appearance"],
           order = 2,
           inline = true,
           args = {
+            glowType = {
+              type = "select",
+              name = L["Glow Type"],
+              order = 1,
+              set = SetAndRefreshAppearance,
+              values = {
+                ["Autocast Shine"] = "Autocast Shine",
+                ["Pixel Glow"] = "Pixel Glow",
+                ["Action Button Glow"] = "Action Button Glow",
+                ["Proc Glow"] = "Proc Glow",
+              },
+            },
             glowColorEnable = {
               type = "toggle",
-              name = "Glow Color",
-              order = 1,
+              name = L["Custom Color"],
+              order = 2,
               set = function(i, val)
                 db[i[#i]] = val
                 if not val then
                   db.glowColor.r, db.glowColor.g, db.glowColor.b, db.glowColor.a = 0.95, 0.95, 0.32, 1
                 end
+                RaidCluster:ChangeAppearance()
               end
             },
             glowColor = {
               type = "color",
-              name = "Color",
-              order = 2,
+              name = L["Color"],
+              order = 3,
               hasAlpha = true,
+              hidden = function()
+                return not db.glowColorEnable
+              end,
               get = function()
                 return db.glowColor.r, db.glowColor.g, db.glowColor.b, db.glowColor.a
               end,
               set = function(_, r, g, b, a)
                 db.glowColor.r, db.glowColor.g, db.glowColor.b, db.glowColor.a = r, g, b, a
+                RaidCluster:ChangeAppearance()
               end
             },
             lines = {
               type = "range",
-              name = "Lines & Particles",
-              order = 3,
+              name = L["Lines & Particles"],
+              order = 4,
               min = 1,
               softMax = 30,
               step = 1,
+              set = SetAndRefreshAppearance,
+              hidden = function()
+                return db.glowType == "Action Button Glow" or db.glowType == "Proc Glow"
+              end,
             },
             frequency = {
               type = "range",
-              name = "Frequenzy",
-              order = 4,
+              name = L["Frequency"],
+              order = 5,
               min = -2,
               softMax = 2,
               step = 0.05,
+              set = SetAndRefreshAppearance,
+              hidden = function()
+                return db.glowType == "Proc Glow"
+              end,
             },
             length = {
               type = "range",
-              name = "Length",
-              order = 5,
-              min = 0.05,
-              softMax = 20,
-              step = 0.05,
-            },
-            thickness = {
-              type = "range",
-              name = "Thickness",
+              name = L["Length"],
               order = 6,
               min = 0.05,
               softMax = 20,
               step = 0.05,
+              set = SetAndRefreshAppearance,
+              hidden = function()
+                return db.glowType ~= "Pixel Glow"
+              end,
+            },
+            glowScale = {
+              type = "range",
+              name = L["Scale"],
+              order = 7,
+              min = 0.05,
+              softMax = 10,
+              step = 0.05,
+              isPercent = true,
+              set = SetAndRefreshAppearance,
+              hidden = function()
+                return db.glowType ~= "Autocast Shine"
+              end,
+            },
+            thickness = {
+              type = "range",
+              name = L["Thickness"],
+              order = 8,
+              min = 0.05,
+              softMax = 20,
+              step = 0.05,
+              set = SetAndRefreshAppearance,
+              hidden = function()
+                return db.glowType ~= "Pixel Glow"
+              end,
+            },
+            border = {
+              type = "toggle",
+              name = L["Border"],
+              order = 9,
+              set = SetAndRefreshAppearance,
+              hidden = function()
+                return db.glowType ~= "Pixel Glow"
+              end,
             },
             xOffset = {
               type = "range",
-              name = "X-Offset",
-              order = 7,
+              name = L["X Offset"],
+              order = 10,
               min = -100,
               softMax = 100,
               step = 0.05,
+              set = SetAndRefreshAppearance,
+              hidden = function()
+                return db.glowType == "Action Button Glow"
+              end,
             },
             yOffset = {
               type = "range",
-              name = "Y-Offset",
-              order = 8,
+              name = L["Y Offset"],
+              order = 11,
               min = -100,
               softMax = 100,
               step = 0.05,
+              set = SetAndRefreshAppearance,
+              hidden = function()
+                return db.glowType == "Action Button Glow"
+              end,
+            },
+            procGlowDuration = {
+              type = "range",
+              name = L["Proc Duration"],
+              order = 12,
+              min = 0.1,
+              softMax = 3,
+              step = 0.05,
+              set = SetAndRefreshAppearance,
+              hidden = function()
+                return db.glowType ~= "Proc Glow"
+              end,
+            },
+            procGlowStartAnim = {
+              type = "toggle",
+              name = L["Start Animation"],
+              order = 13,
+              set = SetAndRefreshAppearance,
+              hidden = function()
+                return db.glowType ~= "Proc Glow"
+              end,
             },
           },
         },
       },
     },
-    Paladin = {
-      type = "group",
-      name = "Paladin",
-      order = 3,
-      get = function(i)
-        return db[i[#i]]
-      end,
-      set = function(i, val)
-        db[i[#i]] = val
-      end,
-      args = {
-        paladinRaidFrameEnable = {
-          type = "toggle",
-          name = "Enable Raid Frame",
-          order = 1,
-          set = function(i, val)
-            db[i[#i]] = val
-            RaidCluster:StopAddon()
-            RaidCluster:specDetection()
-          end,
-        },
-        paladinDesc = {
-          type = "description",
-          name = "Displays the number of players in range for " .. RaidCluster:GetSpellLink(55121) .. ".",
-          order = 2,
-          fontSize = "medium",
-        },
-        paladinPixelGlowEnable = {
-          type = "toggle",
-          name = "Enable Pixel Glow",
-          order = 3,
-          set = function(i, val)
-            db[i[#i]] = val
-            RaidCluster:StopAddon()
-            RaidCluster:specDetection()
-          end,
-        },
-        paladinDesc2 = {
-          type = "description",
-          name = "Displays Pixel Glow Effect on players, that you healed with " .. RaidCluster:GetSpellLink(55121) .. ".",
-          order = 4,
-          fontSize = "medium",
-        },
-        paladinTalents = {
-          type = "select",
-          name = "Talent",
-          order = 5,
-          values = function()
-            return RaidCluster:genTalentDropdown("PALADIN")
-          end,
-          set = function(i, val)
-            db[i[#i]] = val
-            RaidCluster:StopAddon()
-            RaidCluster:specDetection()
-          end,
-        },
-      },
-    },
-    Shaman = {
-      type = "group",
-      name = "Shaman",
-      order = 4,
-      get = function(i)
-        return db[i[#i]]
-      end,
-      set = function(i, val)
-        db[i[#i]] = val
-      end,
-      args = {
-        shamanRaidFrameEnable = {
-          type = "toggle",
-          name = "Enable Raid Frame",
-          order = 1,
-          set = function(i, val)
-            db[i[#i]] = val
-            RaidCluster:StopAddon()
-            RaidCluster:specDetection()
-          end,
-        },
-        shamanDesc = {
-          type = "description",
-          name = "Displays the number of players in range for " ..
-          RaidCluster:GetSpellLink(55459) .. ".\nShows players with less than 100% health and chained together.",
-          order = 2,
-          fontSize = "medium",
-        },
-        shamanPixelGlowEnable = {
-          type = "toggle",
-          name = "Enable Pixel Glow",
-          order = 3,
-          set = function(i, val)
-            db[i[#i]] = val
-            RaidCluster:StopAddon()
-            RaidCluster:specDetection()
-          end,
-        },
-        shamanDesc2 = {
-          type = "description",
-          name = "Displays Pixel Glow Effect on players, that you healed with " .. RaidCluster:GetSpellLink(55459) .. ".",
-          order = 4,
-          fontSize = "medium",
-        },
-        shamanTalents = {
-          type = "select",
-          name = "Talent",
-          order = 5,
-          values = function()
-            return RaidCluster:genTalentDropdown("SHAMAN")
-          end,
-          set = function(i, val)
-            db[i[#i]] = val
-            RaidCluster:StopAddon()
-            RaidCluster:specDetection()
-          end,
-        }
-      }
-    },
-    Priest = {
-      type = "group",
-      name = "Priest",
-      order = 5,
-      get = function(i)
-        return db[i[#i]]
-      end,
-      set = function(i, val)
-        db[i[#i]] = val
-      end,
-      args = {
-        discoPriestRaidFrameEnable = {
-          type = "toggle",
-          name = "Enable Raid Frame",
-          order = 1,
-          set = function(i, val)
-            db[i[#i]] = val
-            RaidCluster:StopAddon()
-            RaidCluster:specDetection()
-          end,
-        },
-        discoPriestDesc = {
-          type = "description",
-          name = "Displays the number of players in group in range for " .. RaidCluster:GetSpellLink(48072) .. ".",
-          order = 2,
-          fontSize = "medium",
-        },
-        discoPriestPixelGlowEnable = {
-          type = "toggle",
-          name = "Enable Pixel Glow",
-          order = 3,
-          set = function(i, val)
-            db[i[#i]] = val
-            RaidCluster:StopAddon()
-            RaidCluster:specDetection()
-          end,
-        },
-        discoPriestDesc2 = {
-          type = "description",
-          name = "Displays Pixel Glow Effect on players that you healed with " .. RaidCluster:GetSpellLink(48072) .. ".",
-          order = 4,
-          fontSize = "medium",
-        },
-        discoPriestTalents = {
-          type = "select",
-          name = "Talent",
-          order = 5,
-          values = function()
-            return RaidCluster:genTalentDropdown("PRIEST")
-          end,
-          set = function(i, val)
-            db[i[#i]] = val
-            RaidCluster:StopAddon()
-            RaidCluster:specDetection()
-          end,
-        },
-        Seperator4 = {
-          type = "header",
-          name = "",
-          order = 6,
-        },
-        holyPriestRaidFrameEnable = {
-          type = "toggle",
-          name = "Enable Raid Frame",
-          order = 7,
-          set = function(i, val)
-            db[i[#i]] = val
-            RaidCluster:StopAddon()
-            RaidCluster:specDetection()
-          end,
-        },
-        holyPriestDesc = {
-          type = "description",
-          name = "Displays the number of players in range for " .. RaidCluster:GetSpellLink(48089) .. ".",
-          order = 8,
-          fontSize = "medium",
-        },
-        holyPriestPixelGlowEnable = {
-          type = "toggle",
-          name = "Enable Pixel Glow",
-          order = 9,
-          set = function(i, val)
-            db[i[#i]] = val
-            RaidCluster:StopAddon()
-            RaidCluster:specDetection()
-          end,
-        },
-        holyPriestDesc2 = {
-          type = "description",
-          name = "Displays Pixel Glow Effect on players, that you healed with " .. RaidCluster:GetSpellLink(48089) .. ".",
-          order = 10,
-          fontSize = "medium",
-        },
-        holyPriestTalents = {
-          type = "select",
-          name = "Talent",
-          order = 11,
-          values = function()
-            return RaidCluster:genTalentDropdown("PRIEST")
-          end,
-          set = function(i, val)
-            db[i[#i]] = val
-            RaidCluster:StopAddon()
-            RaidCluster:specDetection()
-          end,
-        },
-      },
-    },
-    Druid = {
-      type = "group",
-      name = "Druid",
-      order = 6,
-      get = function(i)
-        return db[i[#i]]
-      end,
-      set = function(i, val)
-        db[i[#i]] = val
-      end,
-      args = {
-        druidRaidFrameEnable = {
-          type = "toggle",
-          name = "Enable Raid Frame",
-          order = 1,
-          set = function(i, val)
-            db[i[#i]] = val
-            RaidCluster:StopAddon()
-            RaidCluster:specDetection()
-          end,
-        },
-        druidDesc = {
-          type = "description",
-          name = "Displays the number of players in range for " .. RaidCluster:GetSpellLink(53251) .. ".",
-          order = 2,
-          fontSize = "medium",
-        },
-        druidPixelGlowEnable = {
-          type = "toggle",
-          name = "Enable Pixel Glow",
-          order = 3,
-          set = function(i, val)
-            db[i[#i]] = val
-            RaidCluster:StopAddon()
-            RaidCluster:specDetection()
-          end,
-        },
-        druidDesc2 = {
-          type = "description",
-          name = "Displays Pixel Glow Effect on players, that you healed with " .. RaidCluster:GetSpellLink(53251) .. ".",
-          order = 4,
-          fontSize = "medium",
-        },
-        druidTalents = {
-          type = "select",
-          name = "Talent",
-          order = 5,
-          values = function()
-            return RaidCluster:genTalentDropdown("DRUID")
-          end,
-          set = function(i, val)
-            db[i[#i]] = val
-            RaidCluster:StopAddon()
-            RaidCluster:specDetection()
-          end,
-        },
-      },
-    },
+    Paladin = BuildClassOptions("Paladin", 3, { SPEC_OPTIONS.paladin }),
+    Shaman = BuildClassOptions("Shaman", 4, { SPEC_OPTIONS.shaman }),
+    Priest = BuildClassOptions("Priest", 5, { SPEC_OPTIONS.discipline, SPEC_OPTIONS.holy }),
+    Druid = BuildClassOptions("Druid", 6, { SPEC_OPTIONS.druid }),
   },
 }

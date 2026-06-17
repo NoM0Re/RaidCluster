@@ -18,27 +18,12 @@
 
 -- This file contains Utility Functions.
 
-local AddonName = ...
 local RaidCluster = select(2, ...)
 
 -- WoW Api
 local GetTalentInfo = GetTalentInfo
 local GetSpellInfo = GetSpellInfo
 local GetSpellLink = GetSpellLink
-
--- Lua
-function RaidCluster:tableFind(tbl, item)
-  for i, v in ipairs(tbl) do
-    if item == v then
-      return i
-    end
-  end
-end
-
--- Prints Addon messages
-function RaidCluster:ChatPrint(str)
-  if DEFAULT_CHAT_FRAME then DEFAULT_CHAT_FRAME:AddMessage(tostring(str)) end
-end
 
 -- Talent Handling
 RaidCluster.talents_ids = {
