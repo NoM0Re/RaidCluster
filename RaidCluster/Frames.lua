@@ -225,8 +225,9 @@ function RaidCluster:BindBestFrame(info)
 end
 
 function RaidCluster:GetGroupState()
-  if UnitInRaid("player") then
-    return "raid", GetNumRaidMembers() or 0
+  local raidMembers = GetNumRaidMembers() or 0
+  if raidMembers > 0 then
+    return "raid", raidMembers
   end
 
   local partyMembers = GetNumPartyMembers()
@@ -376,6 +377,21 @@ function RaidCluster:RefreshCounters()
   self:RefreshRoster(self.activeClass)
   for _, info in ipairs(self.roster) do
     self:BindBestFrame(info)
+  end
+end
+
+function RaidCluster:RefreshFrameBindings()
+  if not self.activeClass then
+    return
+  end
+
+  for _, info in ipairs(self.roster) do
+    local frame = LGF.GetUnitFrame(info.unit) or LGF.GetUnitFrame(info.name)
+    if frame then
+      self:HandleLGFFrameUnitUpdate(frame, info.unit)
+    else
+      self:BindBestFrame(info)
+    end
   end
 end
 

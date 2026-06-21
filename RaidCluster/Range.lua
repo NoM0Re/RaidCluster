@@ -32,6 +32,10 @@ function RaidCluster:IsPositionValid(x, y)
 end
 
 function RaidCluster:CanCalculateRanges()
+  if not self.mapReady and self.RefreshCurrentMapData then
+    self:RefreshCurrentMapData()
+  end
+
   return self.mapReady and self.mapX and self.mapY and self.mapX > 1 and self.mapY > 1
 end
 
@@ -278,7 +282,7 @@ function RaidCluster:CalculatePlayersToPlayers()
 end
 
 function RaidCluster:CalculateChainedPlayers()
-  self:StartRangeJob("chained", true)
+  self:StartRangeJob("chained", db.shamanLowHealthOnly)
 end
 
 function RaidCluster:CalculateGroupPlayersToGroupPlayers()

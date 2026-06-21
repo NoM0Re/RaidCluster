@@ -35,6 +35,8 @@ L["Limits how many range comparisons are processed per rendered frame. Lower val
 L["Lines & Particles"] = "线条和粒子"
 L["Only in Party"] = "仅小队"
 L["Only in Raid"] = "仅团队"
+L["Only Low Health Targets"] = "仅低生命值目标"
+L["Only count players below 100% health for this counter."] = "此计数器仅统计生命值低于 100% 的玩家。"
 L["Paladin"] = "圣骑士"
 L["Priest"] = "牧师"
 L["Proc Duration"] = "触发持续时间"

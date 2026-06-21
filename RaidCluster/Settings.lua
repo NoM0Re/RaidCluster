@@ -72,47 +72,56 @@ local function BuildSpecOptions(def, orderOffset)
     order = orderOffset + 2,
     set = SetAndRestart,
   }
+  if def.lowHealthOnly then
+    args[def.lowHealthOnly] = {
+      type = "toggle",
+      name = L["Only Low Health Targets"],
+      desc = L["Only count players below 100% health for this counter."],
+      order = orderOffset + 3,
+      set = SetAndRestart,
+    }
+  end
   args[def.key .. "CounterDesc"] = {
     type = "description",
     name = def.counterDesc,
-    order = orderOffset + 3,
+    order = orderOffset + 4,
     fontSize = "small",
   }
   args[def.glow] = {
     type = "toggle",
     name = L["Enable Glow"],
-    order = orderOffset + 4,
+    order = orderOffset + 5,
     set = SetAndRestart,
   }
   args[def.key .. "GlowDesc"] = {
     type = "description",
     name = def.glowDesc,
-    order = orderOffset + 5,
+    order = orderOffset + 6,
     fontSize = "small",
   }
   args[def.raid] = {
     type = "toggle",
     name = L["Only in Raid"],
     width = "full",
-    order = orderOffset + 6,
+    order = orderOffset + 7,
     set = SetAndRestart,
   }
   args[def.party] = {
     type = "toggle",
     name = L["Only in Party"],
     width = "full",
-    order = orderOffset + 7,
+    order = orderOffset + 8,
     set = SetAndRestart,
   }
   args[def.key .. "Activation"] = {
     type = "header",
     name = L["Activation"],
-    order = orderOffset + 8,
+    order = orderOffset + 9,
   }
   args[def.talent] = {
     type = "select",
     name = L["Talent"],
-    order = orderOffset + 9,
+    order = orderOffset + 10,
     values = function()
       return RaidCluster:genTalentDropdown(def.talentClass)
     end,
@@ -124,7 +133,7 @@ local function BuildSpecOptions(def, orderOffset)
   args[def.key .. "TalentDesc"] = {
     type = "description",
     name = def.talentDesc,
-    order = orderOffset + 10,
+    order = orderOffset + 11,
     fontSize = "small",
   }
 
@@ -189,6 +198,7 @@ local SPEC_OPTIONS = {
     counter = "shamanRaidFrameEnable",
     glow = "shamanGlowEnable",
     talent = "shamanTalents",
+    lowHealthOnly = "shamanLowHealthOnly",
     counterDesc = L["Displays the number of players in range for %s."]:format(RaidCluster:GetSpellLink(55459)) ..
       "\n" .. L["Shows players with less than 100% health and chained together."],
     glowDesc = L["Glows players that you healed with %s."]:format(RaidCluster:GetSpellLink(55459)),
@@ -275,6 +285,7 @@ RaidCluster.defaults = {
     shamanEnableInParty = true,
     shamanRaidFrameEnable = true,
     shamanGlowEnable = true,
+    shamanLowHealthOnly = true,
     shamanTalents = 974,
     holyPriestEnable = true,
     holyPriestEnableInRaid = true,

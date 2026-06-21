@@ -35,6 +35,8 @@ L["Limits how many range comparisons are processed per rendered frame. Lower val
 L["Lines & Particles"] = "선 및 입자"
 L["Only in Party"] = "파티에서만"
 L["Only in Raid"] = "공격대에서만"
+L["Only Low Health Targets"] = "체력이 낮은 대상만"
+L["Only count players below 100% health for this counter."] = "이 카운터는 생명력이 100% 미만인 플레이어만 계산합니다."
 L["Paladin"] = "성기사"
 L["Priest"] = "사제"
 L["Proc Duration"] = "발동 지속시간"

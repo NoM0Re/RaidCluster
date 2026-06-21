@@ -35,6 +35,8 @@ L["Limits how many range comparisons are processed per rendered frame. Lower val
 L["Lines & Particles"] = "Lineas y particulas"
 L["Only in Party"] = "Solo en grupo"
 L["Only in Raid"] = "Solo en banda"
+L["Only Low Health Targets"] = "Solo objetivos con poca salud"
+L["Only count players below 100% health for this counter."] = "Solo cuenta jugadores por debajo del 100% de salud para este contador."
 L["Paladin"] = "Paladin"
 L["Priest"] = "Sacerdote"
 L["Proc Duration"] = "Duracion del proc"

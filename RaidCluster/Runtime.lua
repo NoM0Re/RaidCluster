@@ -94,6 +94,7 @@ function RaidCluster:StartAddon(classKey)
   self.rangeMode = config.rangeMode
   self.Range = config.range()
   self:RefreshCounters()
+  self:RefreshFrameBindings()
 
   if self.FPSTimer then
     self:CancelTimer(self.FPSTimer, true)
@@ -192,6 +193,7 @@ function RaidCluster:specDetection()
 
   self.lgfPendingStartup = false
   self:RefreshRoster(classKey)
+  self:RefreshFrameBindings()
 
   if glowEnabled then
     self:StartCLEU(classKey)
@@ -204,6 +206,7 @@ function RaidCluster:specDetection()
       self:StartAddon(classKey)
     else
       self:RefreshRoster(classKey)
+      self:RefreshFrameBindings()
     end
   elseif self.IsInit then
     self:ReleaseCounters()
@@ -294,6 +297,7 @@ local function LGFCallback(event, frame, unit, previousUnit)
       RaidCluster:specDetection()
     else
       RaidCluster:RefreshRoster()
+      RaidCluster:RefreshFrameBindings()
     end
   elseif event == "FRAME_UNIT_ADDED" or event == "FRAME_UNIT_UPDATE" then
     if RaidCluster.lgfReady then
